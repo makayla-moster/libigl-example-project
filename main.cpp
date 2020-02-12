@@ -1,34 +1,87 @@
+#include <igl/readOBJ.h>
 #include <igl/opengl/glfw/Viewer.h>
+#include <igl/barycenter.h>
+#include <igl/cotmatrix.h>
+#include <igl/doublearea.h>
+#include <igl/grad.h>
+#include <igl/jet.h>
+#include <igl/massmatrix.h>
+#include <igl/per_vertex_normals.h>
+#include <igl/readDMAT.h>
+#include <igl/repdiag.h>
+#include <iostream>
+#include <cstdlib>
+#include <ctime>
+#include <igl/min_quad_with_fixed.h>
+#include <igl/setdiff.h>
+#include <igl/slice.h>
+#include <igl/slice_into.h>
+#include <igl/boundary_facets.h>
+#include <igl/colon.h>
+
+Eigen::MatrixXd V, U, V2;
+Eigen::MatrixXi F;
+Eigen::SparseMatrix<double> L;
+igl::opengl::glfw::Viewer viewer;
 
 int main(int argc, char *argv[])
 {
-  // Inline mesh of a cube
-  const Eigen::MatrixXd V= (Eigen::MatrixXd(8,3)<<
-    0.0,0.0,0.0,
-    0.0,0.0,1.0,
-    0.0,1.0,0.0,
-    0.0,1.0,1.0,
-    1.0,0.0,0.0,
-    1.0,0.0,1.0,
-    1.0,1.0,0.0,
-    1.0,1.0,1.0).finished();
-  const Eigen::MatrixXi F = (Eigen::MatrixXi(12,3)<<
-    1,7,5,
-    1,3,7,
-    1,4,3,
-    1,2,4,
-    3,8,7,
-    3,4,8,
-    5,7,8,
-    5,8,6,
-    1,5,6,
-    1,6,2,
-    2,6,8,
-    2,8,4).finished().array()-1;
+	using namespace Eigen;
+	using namespace std;
 
-  // Plot the mesh
-  igl::opengl::glfw::Viewer viewer;
-  viewer.data().set_mesh(V, F);
-  viewer.data().set_face_based(true);
-  viewer.launch();
+	srand(time(NULL));
+
+	double alpha = 3.0;
+	double beta = 9.0;
+	double db = 2.25;
+
+	//Brusselator Variables
+	double domainScale = 16.0;
+	double timeStepRate = 0.1;
+	double imW = 128.0;
+	double dH = 1;
+	double dH_Sq = dH * dH;
+	double dT_Org = timeStepRate * dH_Sq;
+	double mEL = dH;
+	double avL = 0.0;
+
+	igl::readOBJ("C:/Users/mmoster/Reaction_Diffusion/Research_RD_Systems/NEW_RD_System/SurfaceGeometry/BunnyClean1000.obj", V, F);
+
+	Eigen::MatrixXd ColorVals(V.rows(), V.cols());
+
+	for (int i = 0; i < V.rows(); i++) {
+		double u = alpha;
+		double v = beta / alpha;
+		double noiseL = 0.1*alpha;
+		double r = (double(rand())) / double(RAND_MAX);
+		u = (u - r * noiseL);
+
+		for (int j = 0; j < V.cols(); j++) {
+			if (j == 0) {
+				ColorVals(i, j) = u;
+			}
+			else if (j == 1) {
+				ColorVals(i, j) = v;
+			}
+			else {
+				ColorVals(i, j) = 1.00;
+			}
+		}
+	}
+
+	//cout << ColorVals << endl;
+	
+	// compute laplace beltrami operator
+	igl::cotmatrix(ColorVals, F, L);
+
+	SparseMatrix<double> M;
+	igl::massmatrix(ColorVals, F, igl::MASSMATRIX_TYPE_BARYCENTRIC, M);
+	// Solve (M-delta*L) U = M*U
+	const auto & S = (M - 0.001*L);
+	Eigen::SimplicialLLT<Eigen::SparseMatrix<double > > solver(S);
+	assert(solver.info() == Eigen::Success);
+	U = solver.solve(M*U).eval();
+
+	cout << U << endl;
+
 }

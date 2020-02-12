@@ -7,6 +7,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 option(LIBIGL_WITH_OPENGL            "Use OpenGL"         ON)
 option(LIBIGL_WITH_OPENGL_GLFW       "Use GLFW"           ON)
 
+add_definitions(-DEIGEN_DONT_ALIGN)
+
 find_package(LIBIGL REQUIRED QUIET)
 
 # Add your project files
