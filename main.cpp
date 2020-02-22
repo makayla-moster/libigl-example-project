@@ -79,7 +79,7 @@ int main(int argc, char *argv[])
 
 	CV = L * U;
 	CV = CV.cwiseProduct(ColorVals);
-	for (int j = 0; j < 1000000; j++) {
+	for (int j = 0; j < 100000; j++) {
 
 		if (j % 10000 == 0) {
 			cout << j << endl;
@@ -137,18 +137,21 @@ int main(int argc, char *argv[])
 
 			//cout << red << "\t" << green << "\t" << blue << endl;
 
-			finalColors(r, 0) = red;
-			finalColors(r, 1) = green;
-			finalColors(r, 2) = blue;
+			finalColors(r, 0) = int(red);
+			finalColors(r, 1) = int(green);
+			finalColors(r, 2) = int(blue);
 		}
 
 	}
+
+	cout << finalColors << endl;
 
 	igl::opengl::glfw::Viewer viewer;
 	viewer.data().clear();
 	viewer.data().set_mesh(V, F);
 	viewer.data().set_colors(finalColors);
 	viewer.launch();
+	viewer.save_mesh_to_file("TestSave.obj");
 
 	//cout << ColorVals << endl;
 
