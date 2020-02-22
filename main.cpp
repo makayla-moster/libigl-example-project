@@ -11,7 +11,7 @@
 #include <igl/opengl/glfw/Viewer.h>
 #include <cstdlib>
 #include <ctime>
-
+#include <math.h>
 #include <iostream>
 //#include "tutorial_shared_path.h"
 
@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
 
 	igl::readOBJ("C:/Users/mmoster/Reaction_Diffusion/Research_RD_Systems/NEW_RD_System/SurfaceGeometry/BunnyClean1000.obj", V, F);
 
-	Eigen::MatrixXd ColorVals(V.rows(), V.cols());
+	Eigen::MatrixXd ColorVals(V.rows(), V.cols()), finalColors(V.rows(), V.cols());
 
 	for (int i = 0; i < V.rows(); i++) {
 		double u = alpha;
@@ -67,9 +67,6 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	//cout << ColorVals << endl;
-
-	// Compute Laplace-Beltrami operator: #V by #V
 	igl::cotmatrix(V, F, L);
 
 	U = V;
@@ -80,94 +77,79 @@ int main(int argc, char *argv[])
 	assert(solver.info() == Eigen::Success);
 	U = solver.solve(M*U).eval();
 
-	//cout << L.rows() << "\t" << L.cols() << endl;
-	//cout << U.rows() << "\t" << U.cols() << endl;
-
 	CV = L * U;
-
-	/*cout << ColorVals.rows() << "\t" << ColorVals.cols() << endl;
-	cout << CV.rows() << "\t" << CV.cols() << endl;*/
 	CV = CV.cwiseProduct(ColorVals);
-	//cout << CV.rows() << "\t" << CV.cols() << endl;
+	for (int j = 0; j < 1000000; j++) {
 
-	//cout << CV << endl; 
+		if (j % 10000 == 0) {
+			cout << j << endl;
+		}
 
-	for (int i = 0; i < CV.rows(); i++) {
-		double u = ColorVals(i, 0);
-		double v = ColorVals(i, 1);
-		double lapU = CV(i, 0);
-		double lapV = CV(i, 1);
+		for (int i = 0; i < CV.rows(); i++) {
+			double u = ColorVals(i, 0);
+			double v = ColorVals(i, 1);
+			double lapU = CV(i, 0);
+			double lapV = CV(i, 1);
 
-		double Fa = s * (alpha - ((1.0 + beta) * u) + ((u * u) * v));
-		double Ga = s * ((beta * u) - ((u * u) * v));
-		double delU = Fa + lapU;
-		double delV = Ga + (db * lapV);
+			double Fa = s * (alpha - ((1.0 + beta) * u) + ((u * u) * v));
+			double Ga = s * ((beta * u) - ((u * u) * v));
+			double delU = Fa + lapU;
+			double delV = Ga + (db * lapV);
 
-		u = u + dT_Org * delU;
-		v = v + dT_Org * delV;
+			u = u + dT_Org * delU;
+			v = v + dT_Org * delV;
 
-		u = max(0.0, u);
-		v = max(0.0, v);
+			u = max(0.0, u);
+			v = max(0.0, v);
+
+			ColorVals(i, 0) = u;
+			ColorVals(i, 1) = v;
+			ColorVals(i, 2) = 1.0;
+		}
+
+		double averageU = 0.0;
+
+		for (int q = 0; q < ColorVals.rows(); q++) {
+			averageU += ColorVals(q, 0);
+		}
+
+		averageU = averageU / ColorVals.rows();
+
+		//cout << averageU << endl;
+
+		double sum = 0.0;
+		for (int k = 0; k < ColorVals.rows(); k++) {
+			sum += (ColorVals(k, 0) - averageU) * (ColorVals(k, 0) - averageU);
+		}
+
+		double sz = ColorVals.rows();
+		double stdDev = sqrt((1.0 / (ColorVals.rows() - 1)) * sum);
+		double minU = averageU - 3 * stdDev;
+		double maxU = averageU + 3 * stdDev;
+
+		for (int r = 0; r < ColorVals.rows(); r++) {
+			double currentU = ColorVals(r, 0);
+			double u_im = (currentU - minU) / (maxU - minU);
+
+			double red = u_im * 255.0;
+			double green = u_im * 255.0;
+			double blue = 1.0 * 255.0;
+
+			//cout << red << "\t" << green << "\t" << blue << endl;
+
+			finalColors(r, 0) = red;
+			finalColors(r, 1) = green;
+			finalColors(r, 2) = blue;
+		}
+
 	}
 
+	igl::opengl::glfw::Viewer viewer;
+	viewer.data().clear();
+	viewer.data().set_mesh(V, F);
+	viewer.data().set_colors(finalColors);
+	viewer.launch();
 
-	//const auto &key_down = [](igl::opengl::glfw::Viewer &viewer, unsigned char key, int mod)->bool
-	//{
-	//	switch (key)
-	//	{
-	//	case 'r':
-	//	case 'R':
-	//		U = V;
-	//		break;
-	//	case ' ':
-	//	{
-	//		// Recompute just mass matrix on each step
-	//		SparseMatrix<double> M;
-	//		igl::massmatrix(U, F, igl::MASSMATRIX_TYPE_BARYCENTRIC, M);
-	//		// Solve (M-delta*L) U = M*U
-	//		const auto & S = (M - 0.001*L);
-	//		Eigen::SimplicialLLT<Eigen::SparseMatrix<double > > solver(S);
-	//		assert(solver.info() == Eigen::Success);
-	//		U = solver.solve(M*U).eval();
-	//		// Compute centroid and subtract (also important for numerics)
-	//		VectorXd dblA;
-	//		igl::doublearea(U, F, dblA);
-	//		double area = 0.5*dblA.sum();
-	//		MatrixXd BC;
-	//		igl::barycenter(U, F, BC);
-	//		RowVector3d centroid(0, 0, 0);
-	//		for (int i = 0; i < BC.rows(); i++)
-	//		{
-	//			centroid += 0.5*dblA(i) / area * BC.row(i);
-	//		}
-	//		U.rowwise() -= centroid;
-	//		// Normalize to unit surface area (important for numerics)
-	//		U.array() /= sqrt(area);
-	//		break;
-	//	}
-	//	default:
-	//		return false;
-	//	}
-	//	// Send new positions, update normals, recenter
-	//	viewer.data().set_vertices(U);
-	//	viewer.data().compute_normals();
-	//	viewer.core().align_camera_center(U, F);
-	//	return true;
-	//};
+	//cout << ColorVals << endl;
 
-
-	//// Use original normals as pseudo-colors
-	//MatrixXd N;
-	//igl::per_vertex_normals(V, F, N);
-	//MatrixXd C = N.rowwise().normalized().array()*0.5 + 0.5;
-
-	//// Initialize smoothing with base mesh
-	//U = V;
-	//viewer.data().set_mesh(U, F);
-	//viewer.data().set_colors(C);
-	//viewer.callback_key_down = key_down;
-
-	//cout << "Press [space] to smooth." << endl;;
-	//cout << "Press [r] to reset." << endl;;
-	//return viewer.launch();
 }
